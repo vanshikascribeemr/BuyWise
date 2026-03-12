@@ -493,21 +493,40 @@ ${JSON.stringify(marketplaceAvailability, null, 2)}
 
 Price Alert Triggered: ${alertTriggered ? 'Yes — price has dropped to user target!' : 'No'}
 
-Provide a clear purchase recommendation. Consider:
+Provide a detailed, highly transparent purchase recommendation. Consider:
 - Is the current price good relative to historical average?
 - Is the price trending up or down?
 - Which platform offers the safest/best purchase?
-- Are there better alternatives the user should consider?
-- If refurbished options exist AND are cheaper than new, mention them as a savings opportunity.
+- *Crucially: Why it fits the user (pros/alignment) and where it compromises (cons/trade-offs).*
+- Provide *one specific cheaper alternative* and *one specific premium upgrade*.
+- Provide a *Resale Value Estimate* and a *Total Cost of Ownership* calculation including usage-specific factors.
+- If refurbished options exist AND are cheaper than new, mention them.
 - If a price alert was triggered, emphasize urgency.
 - Include marketplace availability in reasoning (which stores have it, which don't).
 
-Return ONLY this JSON:
+Return ONLY this precise JSON format:
 {
   "buyRecommendation": "Buy Now" | "Wait for Drop" | "Consider Alternatives",
-  "reasoning": ["reason 1 with specific data", "reason 2", "reason 3", "reason 4"],
-  "alternativeSuggestion": "A specific alternative product suggestion, or 'None'",
-  "historicalInsight": "One sentence about the price history context"
+  "reasoning": [
+    "Fits user because [reason]",
+    "Trade-offs: [reason]",
+    "Other reasons..."
+  ],
+  "cheaperAlternative": {
+    "name": "Product Name",
+    "platform": "Amazon / Flipkart / etc.",
+    "price": 10000,
+    "reasoning": "Why this is a viable cheaper option"
+  },
+  "premiumUpgrade": {
+    "name": "Product Name",
+    "platform": "Amazon / Flipkart / etc.",
+    "price": 20000,
+    "reasoning": "Why this is a premium upgrade"
+  },
+  "resaleValueEstimate": "₹X after Y years",
+  "totalCostOfOwnership": "₹X including [specific factors]",
+  "historicalInsight": "Current price is X% below 30-day average..."
 }`;
 
   try {
@@ -522,7 +541,11 @@ Return ONLY this JSON:
     return {
       buyRecommendation: parsed.buyRecommendation || 'Buy Now',
       reasoning: parsed.reasoning || ['Based on live market data, this appears to be a fair deal.'],
-      alternativeSuggestion: parsed.alternativeSuggestion || 'None',
+      alternativeSuggestion: 'See cheaper/premium alternatives.', 
+      cheaperAlternative: parsed.cheaperAlternative,
+      premiumUpgrade: parsed.premiumUpgrade,
+      resaleValueEstimate: parsed.resaleValueEstimate,
+      totalCostOfOwnership: parsed.totalCostOfOwnership,
       historicalInsight: parsed.historicalInsight || 'Insufficient historical data for trend analysis.',
       dealScore: product.overallDealScore,
       dealQuality: product.dealQuality || 'Fair Deal',

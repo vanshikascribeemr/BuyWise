@@ -142,7 +142,21 @@ export interface PriceTrendSummary {
 export interface PurchaseAdvisorResponse {
   buyRecommendation: 'Buy Now' | 'Wait for Drop' | 'Consider Alternatives';
   reasoning: string[];
-  alternativeSuggestion: string;
+  alternativeSuggestion: string; // Legacy fallback
+  cheaperAlternative?: {
+    name: string;
+    platform: string;
+    price: number;
+    reasoning: string;
+  };
+  premiumUpgrade?: {
+    name: string;
+    platform: string;
+    price: number;
+    reasoning: string;
+  };
+  resaleValueEstimate?: string;
+  totalCostOfOwnership?: string;
   dealScore: number;
   dealQuality: string;
   bestDealPlatform: string;

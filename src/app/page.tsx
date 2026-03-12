@@ -10,7 +10,7 @@ import {
   Trophy, Plus, Minus, BarChart3, Star, ChevronDown, 
   MessageCircle, ThumbsUp, MessageSquare, PlusCircle, Heart,
   MinusCircle, Mic, MicOff, Volume2, StopCircle,
-  Bell, BellRing, RefreshCw, Recycle, TrendingDown, DollarSign, Zap
+  Bell, BellRing, RefreshCw, Recycle, TrendingDown, DollarSign, Zap, Activity
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -811,11 +811,46 @@ export default function BuyWiseV2() {
                         </div>
                       )}
 
-                      {/* ALTERNATIVE SUGGESTION */}
-                      {detailData.advisor?.alternativeSuggestion && detailData.advisor.alternativeSuggestion !== "None" && (
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl">
-                           <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertCircle className="w-3.5 h-3.5" /> Consider Alternative</div>
-                           <p className="text-sm text-gray-300">{detailData.advisor.alternativeSuggestion}</p>
+                      {/* DETAILED ALTERNATIVES & UPGRADES */}
+                      {detailData.advisor?.cheaperAlternative && (
+                        <div className="bg-white/5 border border-white/10 p-5 rounded-3xl">
+                           <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-2"><TrendingDown className="w-3.5 h-3.5" /> Cheaper Alternative</div>
+                           <div className="flex justify-between items-start mb-2">
+                             <div className="font-bold text-white text-sm">{detailData.advisor.cheaperAlternative.name}</div>
+                             <div className="text-amber-300 font-black text-sm whitespace-nowrap">₹{detailData.advisor.cheaperAlternative.price?.toLocaleString()}</div>
+                           </div>
+                           <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-2">Available on {detailData.advisor.cheaperAlternative.platform}</div>
+                           <p className="text-xs text-gray-300 leading-relaxed">{detailData.advisor.cheaperAlternative.reasoning}</p>
+                        </div>
+                      )}
+
+                      {detailData.advisor?.premiumUpgrade && (
+                        <div className="bg-white/5 border border-white/10 p-5 rounded-3xl bg-gradient-to-br from-purple-500/5 to-transparent border-purple-500/20">
+                           <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-2 flex items-center gap-2"><TrendingUp className="w-3.5 h-3.5" /> Premium Upgrade</div>
+                           <div className="flex justify-between items-start mb-2">
+                             <div className="font-bold text-white text-sm">{detailData.advisor.premiumUpgrade.name}</div>
+                             <div className="text-purple-300 font-black text-sm whitespace-nowrap">₹{detailData.advisor.premiumUpgrade.price?.toLocaleString()}</div>
+                           </div>
+                           <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-2">Available on {detailData.advisor.premiumUpgrade.platform}</div>
+                           <p className="text-xs text-gray-300 leading-relaxed">{detailData.advisor.premiumUpgrade.reasoning}</p>
+                        </div>
+                      )}
+
+                      {/* TOTAL COST OF OWNERSHIP & RESALE */}
+                      {(detailData.advisor?.totalCostOfOwnership || detailData.advisor?.resaleValueEstimate) && (
+                        <div className="grid grid-cols-2 gap-4 mt-2">
+                           {detailData.advisor?.totalCostOfOwnership && (
+                             <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                               <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Activity className="w-3 h-3" /> Est. Total Cost</div>
+                               <p className="text-xs text-gray-300 leading-snug">{detailData.advisor.totalCostOfOwnership}</p>
+                             </div>
+                           )}
+                           {detailData.advisor?.resaleValueEstimate && (
+                             <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                               <div className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Recycle className="w-3 h-3" /> Resale Value</div>
+                               <p className="text-xs text-gray-300 leading-snug">{detailData.advisor.resaleValueEstimate}</p>
+                             </div>
+                           )}
                         </div>
                       )}
                       
