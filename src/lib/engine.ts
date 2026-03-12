@@ -6,16 +6,29 @@
 // and NO static marketplace data of any kind.
 
 import { AggregatedProduct, ScoredProduct, ScoredListing, UserPreferences, YouTubeVideo, RedditInsights } from './types';
+import { PriceHistoryMetrics } from './priceHistory';
 
 // ============================================================
 // DEAL SCORING ENGINE
-// Runs ONLY after real marketplace data is available.
+// Score weights: 40% price | 25% discount | 15% rating | 10% delivery | 10% warranty
 // ============================================================
 
-export function calculateDealScores(product: AggregatedProduct, preferences?: UserPreferences, historyMetrics?: any): ScoredProduct {
+function parseDeliveryDays(deliveryTime: string): number {
+  if (!deliveryTime) return 7;
+  const lower = deliveryTime.toLowerCase();
+  if (lower.includes('same day') || lower.includes('today')) return 0;
+  if (lower.includes('tomorrow') || lower.includes('1 day')) return 1;
+  if (lower.includes('2 day') || lower.includes('2-day')) return 2;
+  if (lower.includes('3 day') || lower.includes('2-3')) return 3;
+  const match = lower.match(/(\d+)/);
+  if (match) return parseInt(match[1]);
+  if (lower.includes('store pickup')) return 1;
+  return 5; // default for "standard delivery"
+}
+
+export function calculateDealScores(product: AggregatedProduct, preferences?: UserPreferences, historyMetrics?: PriceHistoryMetrics | null): ScoredProduct {
   const listings = product.listings;
 
-  // Guard: if no listings available, return minimal scored product
   if (listings.length === 0) {
     return {
       ...product,
@@ -45,35 +58,38 @@ export function calculateDealScores(product: AggregatedProduct, preferences?: Us
   const maxPrice = Math.max(...availableListings.map(l => l.price));
   const maxWarranty = Math.max(...availableListings.map(l => l.warrantyYears), 1);
   const maxDiscount = Math.max(...availableListings.map(l => l.discount), 1);
+  const deliveryDays = availableListings.map(l => parseDeliveryDays(l.deliveryTime));
+  const maxDelivery = Math.max(...deliveryDays, 1);
 
-  const scoredListings: ScoredListing[] = listings.map(l => {
+  const scoredListings: ScoredListing[] = listings.map((l, idx) => {
     if (l.price === 0) return { ...l, dealScore: 0 };
 
-    // Base Weights
-    let wPrice = 0.4, wRating = 0.3, wWarranty = 0.2, wDiscount = 0.1;
+    // Base Weights (spec: 40/25/15/10/10)
+    let wPrice = 0.40, wDiscount = 0.25, wRating = 0.15, wDelivery = 0.10, wWarranty = 0.10;
 
     // Apply Personalization Weights
     if (preferences?.priorities) {
-      if (preferences.priorities.includes('price')) { wPrice += 0.2; wRating -= 0.1; wWarranty -= 0.1; }
-      if (preferences.priorities.includes('performance')) { wRating += 0.2; wPrice -= 0.1; wDiscount -= 0.1; }
+      if (preferences.priorities.includes('price')) { wPrice += 0.15; wRating -= 0.05; wDiscount += 0.05; wDelivery -= 0.05; wWarranty -= 0.10; }
+      if (preferences.priorities.includes('performance')) { wRating += 0.15; wPrice -= 0.10; wWarranty -= 0.05; }
       if (preferences.priorities.includes('durability') || preferences.priorities.includes('battery')) {
-        wWarranty += 0.2; wPrice -= 0.1; wDiscount -= 0.1;
+        wWarranty += 0.15; wPrice -= 0.05; wDiscount -= 0.10;
       }
     }
 
     const priceScore = maxPrice === minPrice ? 1 : 1 - (l.price - minPrice) / (maxPrice - minPrice || 1);
-    const warrantyScore = l.warrantyYears / maxWarranty;
     const discountScore = l.discount / (maxDiscount || 1);
     const ratingScore = l.rating / 5;
+    const deliveryScore = maxDelivery === 0 ? 1 : 1 - (parseDeliveryDays(l.deliveryTime) / (maxDelivery || 1));
+    const warrantyScore = l.warrantyYears / maxWarranty;
 
-    let totalScore = (wPrice * priceScore) + (wRating * ratingScore) + (wWarranty * warrantyScore) + (wDiscount * discountScore);
+    let totalScore = (wPrice * priceScore) + (wDiscount * discountScore) + (wRating * ratingScore) + (wDelivery * deliveryScore) + (wWarranty * warrantyScore);
     
     // Historical Boost
     if (historyMetrics && historyMetrics.avgPrice > 0) {
        if (l.price < historyMetrics.avgPrice) {
-         totalScore += 0.15 * (1 - l.price / historyMetrics.avgPrice); // Boost for being below average
+         totalScore += 0.15 * (1 - l.price / historyMetrics.avgPrice);
        } else if (l.price > historyMetrics.avgPrice) {
-         totalScore -= 0.1 * (l.price / historyMetrics.avgPrice - 1); // Penalty for being above average
+         totalScore -= 0.1 * (l.price / historyMetrics.avgPrice - 1);
        }
     }
     
@@ -87,13 +103,16 @@ export function calculateDealScores(product: AggregatedProduct, preferences?: Us
   const finalScore = bestListing?.dealScore || 0;
   
   let dealQuality = 'Fair Deal';
-  if (finalScore >= 90) dealQuality = 'Must Buy';
+  if (finalScore >= 90) dealQuality = 'Excellent Deal';
   else if (finalScore >= 80) dealQuality = 'Great Deal';
   else if (finalScore >= 70) dealQuality = 'Good Deal';
   else if (finalScore < 50) dealQuality = 'Wait for Drop';
   
   if (historyMetrics && minPrice >= historyMetrics.maxPrice && historyMetrics.dataPoints > 2) {
-    dealQuality = 'Historically High - Wait';
+    dealQuality = 'Historically High — Wait';
+  }
+  if (historyMetrics?.isHistoricalLow) {
+    dealQuality = finalScore >= 70 ? 'Historical Low — Buy Now!' : dealQuality;
   }
 
   return {

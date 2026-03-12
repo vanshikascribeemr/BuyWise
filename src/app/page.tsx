@@ -9,11 +9,12 @@ import {
   Tag, Loader2, TrendingUp, Info, Filter, X, ChevronLeft,
   Trophy, Plus, Minus, BarChart3, Star, ChevronDown, 
   MessageCircle, ThumbsUp, MessageSquare, PlusCircle, Heart,
-  MinusCircle, Mic, MicOff, Volume2, StopCircle
+  MinusCircle, Mic, MicOff, Volume2, StopCircle,
+  Bell, BellRing, RefreshCw, Recycle, TrendingDown, DollarSign, Zap
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -40,6 +41,18 @@ export default function BuyWiseV2() {
   });
   const [advisorResults, setAdvisorResults] = useState<any[]>([]);
   
+  // Price Alert States
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertTargetPrice, setAlertTargetPrice] = useState('');
+  const [alertEmail, setAlertEmail] = useState('');
+  const [alertSuccess, setAlertSuccess] = useState(false);
+  const [alertLoading, setAlertLoading] = useState(false);
+
+  // Refurbished Deals States
+  const [refurbListings, setRefurbListings] = useState<any[]>([]);
+  const [refurbLoading, setRefurbLoading] = useState(false);
+  const [showRefurbished, setShowRefurbished] = useState(false);
+
   // Voice System States
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -216,6 +229,51 @@ export default function BuyWiseV2() {
       console.error(error);
     } finally {
       setTimeout(() => setLoading(false), 800);
+    }
+  };
+
+  // ── Price Alert Handler ──
+  const handleCreateAlert = async () => {
+    if (!alertTargetPrice || !detailData?.product?.id) return;
+    setAlertLoading(true);
+    try {
+      const res = await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: detailData.product.id,
+          targetPrice: parseFloat(alertTargetPrice),
+          email: alertEmail || undefined,
+        }),
+      });
+      if (res.ok) {
+        setAlertSuccess(true);
+        setTimeout(() => { setAlertSuccess(false); setShowAlertModal(false); }, 2500);
+      }
+    } catch (err) {
+      console.error('Alert creation failed:', err);
+    } finally {
+      setAlertLoading(false);
+    }
+  };
+
+  // ── Refurbished Deals Fetcher ──
+  const fetchRefurbishedDeals = async () => {
+    if (!detailData?.product?.id) return;
+    setRefurbLoading(true);
+    try {
+      const res = await fetch('/api/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'refurbished', productId: detailData.product.id }),
+      });
+      const data = await res.json();
+      setRefurbListings(data.allListings || data.listings || []);
+      setShowRefurbished(true);
+    } catch (err) {
+      console.error('Refurbished fetch failed:', err);
+    } finally {
+      setRefurbLoading(false);
     }
   };
 
@@ -564,24 +622,77 @@ export default function BuyWiseV2() {
                  </div>
               </div>
 
-               {/* NEW AI PURCHASE ADVISOR BLOCK */}
+               {/* AI PURCHASE ADVISOR — FULL RESPONSE */}
                <div className="bg-gradient-to-br from-indigo-900 to-black rounded-[48px] p-12 text-white shadow-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 blur-[100px] rounded-full pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-500/10 blur-[80px] rounded-full pointer-events-none" />
                   
+                  {/* ALERT TRIGGERED BANNER */}
+                  {detailData.advisor?.priceDropAlertTriggered && (
+                    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 bg-emerald-500/20 border border-emerald-400/30 p-5 rounded-2xl flex items-center gap-4 backdrop-blur-sm relative z-10">
+                      <div className="w-12 h-12 bg-emerald-400 rounded-xl flex items-center justify-center animate-pulse"><BellRing className="w-6 h-6 text-white" /></div>
+                      <div>
+                        <div className="text-sm font-black text-emerald-300 uppercase tracking-widest">Price Drop Alert Triggered!</div>
+                        <p className="text-emerald-100/80 text-xs font-medium mt-1">The price has dropped to your target — act now!</p>
+                      </div>
+                    </motion.div>
+                  )}
+
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 relative z-10">
                     <div className="space-y-8">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
-                          <Sparkles className="w-7 h-7 text-blue-400" />
+                      {/* HEADER: Advisor + Recommendation Badge */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                            <Sparkles className="w-7 h-7 text-blue-400" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-black tracking-[0.2em] text-blue-300 uppercase mb-1">AI Purchase Advisor</div>
+                            <div className="text-4xl font-black tracking-tight">{detailData.advisor?.dealQuality || detailData.product.dealQuality}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-[10px] font-black tracking-[0.2em] text-blue-300 uppercase mb-1">AI Purchase Advisor</div>
-                          <div className="text-4xl font-black tracking-tight">{detailData.product.dealQuality}</div>
+                        {/* BUY RECOMMENDATION BADGE */}
+                        {detailData.advisor?.buyRecommendation && (
+                          <div className={cn(
+                            "px-5 py-3 rounded-2xl text-sm font-black uppercase tracking-widest whitespace-nowrap flex items-center gap-2 shadow-lg",
+                            detailData.advisor.buyRecommendation === 'Buy Now' ? "bg-emerald-500 text-white shadow-emerald-500/30" :
+                            detailData.advisor.buyRecommendation === 'Wait for Drop' ? "bg-amber-500 text-white shadow-amber-500/30" :
+                            "bg-blue-500 text-white shadow-blue-500/30"
+                          )}>
+                            {detailData.advisor.buyRecommendation === 'Buy Now' && <ShoppingCart className="w-4 h-4" />}
+                            {detailData.advisor.buyRecommendation === 'Wait for Drop' && <TrendingDown className="w-4 h-4" />}
+                            {detailData.advisor.buyRecommendation === 'Consider Alternatives' && <RefreshCw className="w-4 h-4" />}
+                            {detailData.advisor.buyRecommendation}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* DEAL SCORE METER */}
+                      <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2"><BarChart3 className="w-3.5 h-3.5" /> Deal Score</div>
+                          <div className="text-3xl font-black">{detailData.advisor?.dealScore || detailData.product.overallDealScore}%</div>
+                        </div>
+                        <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }} animate={{ width: `${detailData.advisor?.dealScore || detailData.product.overallDealScore}%` }}
+                            transition={{ duration: 1.2, ease: 'easeOut' }}
+                            className={cn(
+                              "h-full rounded-full",
+                              (detailData.advisor?.dealScore || detailData.product.overallDealScore) >= 80 ? "bg-gradient-to-r from-emerald-400 to-emerald-300" :
+                              (detailData.advisor?.dealScore || detailData.product.overallDealScore) >= 60 ? "bg-gradient-to-r from-blue-400 to-blue-300" :
+                              "bg-gradient-to-r from-amber-400 to-amber-300"
+                            )}
+                          />
+                        </div>
+                        <div className="flex justify-between mt-2 text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+                          <span>Poor</span><span>Fair</span><span>Good</span><span>Excellent</span>
                         </div>
                       </div>
                       
+                      {/* REASONING LIST */}
                       <div className="space-y-4">
-                        {detailData.aiAnalysis?.reasoning?.map((reason: string, i: number) => (
+                        {(detailData.advisor?.reasoning || detailData.aiAnalysis?.reasoning || []).map((reason: string, i: number) => (
                           <div key={i} className="flex gap-4">
                             <div className="w-6 h-6 mt-1 flex-shrink-0 bg-blue-500/20 rounded-full flex items-center justify-center"><Check className="w-3.5 h-3.5 text-blue-400" /></div>
                             <p className="text-gray-300 text-sm leading-relaxed">{reason}</p>
@@ -589,15 +700,130 @@ export default function BuyWiseV2() {
                         ))}
                       </div>
 
-                      {detailData.aiAnalysis?.alternativeSuggestion && detailData.aiAnalysis.alternativeSuggestion !== "None" && (
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl mt-6">
-                           <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertCircle className="w-3.5 h-3.5" /> Alternative Option</div>
-                           <p className="text-sm text-gray-300">{detailData.aiAnalysis.alternativeSuggestion}</p>
+                      {/* MARKETPLACE AVAILABILITY */}
+                      {detailData.advisor?.marketplaceAvailability && (
+                        <div className="bg-white/5 p-5 rounded-3xl border border-white/10 space-y-3">
+                          <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2"><ShoppingCart className="w-3.5 h-3.5" /> Marketplace Availability</div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {Object.entries(detailData.advisor.marketplaceAvailability).map(([platform, status]: [string, any]) => (
+                              <div key={platform} className={cn(
+                                "p-3 rounded-xl flex items-center gap-3",
+                                String(status).includes('Not') ? "bg-red-500/10" : "bg-emerald-500/10"
+                              )}>
+                                <div className={cn(
+                                  "w-2 h-2 rounded-full flex-shrink-0",
+                                  String(status).includes('Not') ? "bg-red-400" : "bg-emerald-400"
+                                )} />
+                                <div className="min-w-0">
+                                  <div className="text-xs font-black text-white truncate">{platform}</div>
+                                  {typeof status === 'string' && status.includes('₹') ? (
+                                    <div className={cn(
+                                      "text-[10px] uppercase font-bold tracking-wider truncate flex items-center gap-1.5",
+                                      status.includes('Not') ? "text-red-300" : "text-emerald-300"
+                                    )}>
+                                      <span>{status}</span>
+                                      {detailData.product.listings?.find((l: any) => l.platform === platform)?.originalPrice > 
+                                       detailData.product.listings?.find((l: any) => l.platform === platform)?.price && (
+                                        <div className="flex items-center gap-1.5 translate-y-[0.5px]">
+                                          <span className="text-gray-500 line-through text-[9px]">
+                                            ₹{detailData.product.listings.find((l: any) => l.platform === platform).originalPrice.toLocaleString()}
+                                          </span>
+                                          {detailData.product.listings.find((l: any) => l.platform === platform).discount > 0 && (
+                                            <span className="text-emerald-400 text-[9px] font-black bg-emerald-500/10 px-1 py-0.5 rounded">
+                                              {detailData.product.listings.find((l: any) => l.platform === platform).discount}% OFF
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className={cn(
+                                      "text-[9px] font-bold uppercase tracking-wider truncate",
+                                      String(status).includes('Not') ? "text-red-300" : "text-emerald-300"
+                                    )}>{String(status)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PRICE TREND SUMMARY */}
+                      {detailData.advisor?.priceTrendSummary && (
+                        <div className="bg-white/5 p-6 rounded-3xl border border-white/10 space-y-5">
+                          <div className="text-[10px] font-black text-purple-400 uppercase tracking-widest flex items-center gap-2"><TrendingUp className="w-3.5 h-3.5" /> Price Intelligence</div>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Current</div>
+                              <div className="text-lg font-black text-white">₹{detailData.advisor.priceTrendSummary.currentPrice.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Avg (30d)</div>
+                              <div className="text-lg font-black text-blue-300">₹{detailData.advisor.priceTrendSummary.historicalAverage.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Lowest</div>
+                              <div className="text-lg font-black text-emerald-300">₹{detailData.advisor.priceTrendSummary.lowestPrice.toLocaleString()}</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-4">
+                            <div className="flex-1 bg-white/5 p-3 rounded-xl">
+                              <div className="text-[9px] font-bold text-gray-500 uppercase mb-1">Volatility</div>
+                              <div className={cn("text-sm font-black",
+                                detailData.advisor.priceTrendSummary.volatility === 'Low' ? 'text-emerald-300' :
+                                detailData.advisor.priceTrendSummary.volatility === 'Medium' ? 'text-amber-300' : 'text-red-300'
+                              )}>{detailData.advisor.priceTrendSummary.volatility}</div>
+                            </div>
+                            <div className="flex-[2] bg-white/5 p-3 rounded-xl">
+                              <div className="text-[9px] font-bold text-gray-500 uppercase mb-1">Best Buying Window</div>
+                              <div className="text-sm font-black text-blue-200">{detailData.advisor.priceTrendSummary.predictedBestBuyingWindow}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* HISTORICAL INSIGHTS ROW */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                           <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1"><TrendingDown className="w-3 h-3" /> Best Buying Day</div>
+                           <div className="text-lg font-black text-white">{detailData.product.historicalContext?.bestBuyingDay || "Tracking..."}</div>
+                        </div>
+                        <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                           <div className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> Price Stability</div>
+                           <div className="text-lg font-black text-white">{detailData.product.historicalContext?.volatility < 500 ? "Stable" : "Volatile"}</div>
+                        </div>
+                      </div>
+
+                      {/* REFURBISHED OPTIONS */}
+                      {detailData.advisor?.refurbishedOptions?.length > 0 && (
+                        <div className="bg-emerald-500/10 border border-emerald-400/20 p-6 rounded-3xl space-y-4">
+                          <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2"><Recycle className="w-3.5 h-3.5" /> Refurbished Options</div>
+                          {detailData.advisor.refurbishedOptions.map((opt: any, i: number) => (
+                            <div key={i} className="bg-white/5 p-4 rounded-2xl flex items-center justify-between">
+                              <div>
+                                <div className="text-sm font-black text-white">{opt.platform}</div>
+                                <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Grade {opt.conditionGrade} · {opt.warranty}</div>
+                              </div>
+                              <div className="text-xl font-black text-emerald-300">₹{opt.price.toLocaleString()}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ALTERNATIVE SUGGESTION */}
+                      {detailData.advisor?.alternativeSuggestion && detailData.advisor.alternativeSuggestion !== "None" && (
+                        <div className="bg-white/5 border border-white/10 p-6 rounded-3xl">
+                           <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertCircle className="w-3.5 h-3.5" /> Consider Alternative</div>
+                           <p className="text-sm text-gray-300">{detailData.advisor.alternativeSuggestion}</p>
                         </div>
                       )}
                       
-                      <button className="bg-blue-600 hover:bg-blue-500 text-white w-full py-5 rounded-full font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-blue-900/50">
-                        Set Price Drop Alert
+                      <button 
+                        onClick={() => setShowAlertModal(true)}
+                        className="bg-blue-600 hover:bg-blue-500 text-white w-full py-5 rounded-full font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-blue-900/50 flex items-center justify-center gap-3"
+                      >
+                        <Bell className="w-5 h-5" /> Set Price Drop Alert
                       </button>
                     </div>
 
@@ -642,15 +868,23 @@ export default function BuyWiseV2() {
                                 itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
                                 labelStyle={{ color: '#999', fontSize: '10px', marginBottom: '4px' }}
                               />
-                              <Line 
-                                type="monotone" 
-                                dataKey="price" 
-                                stroke="#3b82f6" 
-                                strokeWidth={3}
-                                dot={{ fill: '#3b82f6', r: 4, strokeWidth: 2, stroke: '#111' }}
-                                activeDot={{ r: 6, fill: '#fff' }}
-                              />
-                            </LineChart>
+                                <Line 
+                                  type="monotone" 
+                                  dataKey="price" 
+                                  stroke="#3b82f6" 
+                                  strokeWidth={3}
+                                  dot={{ fill: '#3b82f6', r: 4, strokeWidth: 2, stroke: '#111' }}
+                                  activeDot={{ r: 6, fill: '#fff' }}
+                                />
+                                {detailData.product.historicalContext?.minPrice && (
+                                  <ReferenceLine 
+                                    y={detailData.product.historicalContext.minPrice} 
+                                    stroke="#22c55e" 
+                                    strokeDasharray="3 3" 
+                                    label={{ value: 'Best Price', position: 'right', fill: '#22c55e', fontSize: 10, fontWeight: 'bold' }} 
+                                  />
+                                )}
+                              </LineChart>
                           </ResponsiveContainer>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
@@ -660,6 +894,14 @@ export default function BuyWiseV2() {
                           </div>
                         )}
                       </div>
+
+                      {/* HISTORICAL INSIGHT QUOTE */}
+                      {detailData.advisor?.historicalInsight && (
+                        <div className="mt-6 bg-white/5 p-4 rounded-2xl border border-white/10">
+                          <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Historical Insight</div>
+                          <p className="text-xs text-gray-400 italic leading-relaxed">"{detailData.advisor.historicalInsight}"</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                </div>
@@ -716,6 +958,65 @@ export default function BuyWiseV2() {
                        );
                     })}
                  </div>
+              </div>
+
+              {/* REFURBISHED DEALS SECTION */}
+              <div className="bg-emerald-50/50 rounded-[48px] p-12 border border-emerald-100 mt-12 mb-12">
+                <div className="flex justify-between items-center mb-10">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center">
+                      <Recycle className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-black">Refurbished & Renewed</h3>
+                      <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Sustainability & Savings</p>
+                    </div>
+                  </div>
+                  {!showRefurbished ? (
+                    <button 
+                      onClick={fetchRefurbishedDeals}
+                      disabled={refurbLoading}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                    >
+                      {refurbLoading ? "Searching..." : "Search Refurbished"}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => setShowRefurbished(false)}
+                      className="text-emerald-600 font-black text-xs uppercase tracking-widest"
+                    >
+                      Hide Deals
+                    </button>
+                  )}
+                </div>
+
+                {showRefurbished && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {refurbListings.length > 0 ? (
+                      refurbListings.map((l: any, i: number) => (
+                        <div key={i} className="bg-white p-6 rounded-[32px] border border-emerald-100 shadow-sm hover:shadow-md transition-all">
+                          <div className="flex justify-between items-start mb-4">
+                            <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{l.platform}</span>
+                            <span className="text-lg font-black text-black">₹{l.price.toLocaleString()}</span>
+                          </div>
+                          <p className="text-sm font-bold text-gray-800 line-clamp-2 mb-4">{l.title}</p>
+                          <a 
+                            href={l.link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2 hover:gap-3 transition-all"
+                          >
+                            View Deal <ArrowRight className="w-3 h-3" />
+                          </a>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-full py-12 text-center text-gray-500 font-bold text-sm">
+                        No refurbished deals found for this product.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Reddit Community Insights (Collapsible) */}
@@ -1065,6 +1366,64 @@ export default function BuyWiseV2() {
            >
              {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
            </button>
+        </div>
+      )}
+
+      {/* PRICE ALERT MODAL */}
+      {showAlertModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowAlertModal(false)} />
+          <div className="relative bg-white w-full max-w-lg rounded-[48px] overflow-hidden shadow-2xl">
+            <div className="bg-blue-600 p-12 text-white">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6">
+                <BellRing className="w-8 h-8" />
+              </div>
+              <h2 className="text-3xl font-black tracking-tight mb-2">Set Price Alert</h2>
+              <p className="text-blue-100 text-sm font-bold opacity-80 uppercase tracking-widest">We'll notify you when it drops</p>
+            </div>
+            
+            <div className="p-12 space-y-8">
+              {alertSuccess ? (
+                <div className="py-8 text-center space-y-4">
+                  <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                    <Check className="w-10 h-10" />
+                  </div>
+                  <h3 className="text-2xl font-black text-black">Alert Active!</h3>
+                  <p className="text-gray-500 font-bold">We will send you an email when the price drops below ₹{parseFloat(alertTargetPrice).toLocaleString()}.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Target Price (₹)</label>
+                    <input 
+                      type="number" 
+                      value={alertTargetPrice}
+                      onChange={(e) => setAlertTargetPrice(e.target.value)}
+                      placeholder={`Current: ₹${detailData.product.bestPrice}`}
+                      className="w-full bg-gray-50 border-none rounded-3xl p-6 text-xl font-black focus:ring-2 focus:ring-blue-600 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Email Address</label>
+                    <input 
+                      type="email" 
+                      value={alertEmail}
+                      onChange={(e) => setAlertEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full bg-gray-50 border-none rounded-3xl p-6 text-lg font-bold focus:ring-2 focus:ring-blue-600 transition-all"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleCreateAlert}
+                    disabled={alertLoading || !alertTargetPrice}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-full font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-blue-100 disabled:opacity-50"
+                  >
+                    {alertLoading ? "Activating..." : "Enable Tracking"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

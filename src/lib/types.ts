@@ -24,6 +24,7 @@ export interface DiscoveredProduct {
 export interface MarketplaceListing {
   platform: 'Amazon' | 'Flipkart' | 'Reliance Digital' | 'Croma';
   price: number;
+  originalPrice?: number; // Added to support strikethrough MRP UI
   discount: number;
   rating: number;
   seller: string;
@@ -119,4 +120,53 @@ export interface YouTubeVideo {
   views: string;
   thumbnail: string;
   url: string;
+}
+
+// --- AI PURCHASE ADVISOR TYPES ---
+
+export interface RefurbishedOption {
+  platform: string;
+  price: number;
+  conditionGrade: string;
+  warranty: string;
+}
+
+export interface PriceTrendSummary {
+  currentPrice: number;
+  historicalAverage: number;
+  lowestPrice: number;
+  volatility: 'High' | 'Medium' | 'Low';
+  predictedBestBuyingWindow: string;
+}
+
+export interface PurchaseAdvisorResponse {
+  buyRecommendation: 'Buy Now' | 'Wait for Drop' | 'Consider Alternatives';
+  reasoning: string[];
+  alternativeSuggestion: string;
+  dealScore: number;
+  dealQuality: string;
+  bestDealPlatform: string;
+  historicalInsight: string;
+  refurbishedOptions: RefurbishedOption[];
+  priceTrendSummary: PriceTrendSummary | null;
+  priceDropAlertTriggered: boolean;
+  marketplaceAvailability: Record<string, string>;
+}
+
+// --- PRICE ALERT TYPES ---
+
+export interface PriceAlertInput {
+  productId: string;
+  productName: string;
+  targetPrice: number;
+  email?: string;
+}
+
+export interface PriceAlertRecord {
+  id: string;
+  productId: string;
+  targetPrice: number;
+  email: string | null;
+  isTriggered: boolean;
+  createdAt: string;
 }

@@ -79,6 +79,37 @@ export async function hydrateProduct(product: DiscoveredProduct): Promise<Aggreg
     console.warn(`[Marketplace] Partial data for "${product.name}":`, errors);
   }
 
+  const requiredPlatforms: ('Amazon' | 'Flipkart' | 'Reliance Digital' | 'Croma')[] = ['Amazon', 'Flipkart', 'Reliance Digital', 'Croma'];
+  
+  // Inject missing platforms so availability logic works perfectly
+  const completeListings = [...listings];
+  const searchQuery = encodeURIComponent(product.searchKeywords || product.name);
+  const platformSearchUrls: Record<string, string> = {
+    'Amazon': `https://www.amazon.in/s?k=${searchQuery}`,
+    'Flipkart': `https://www.flipkart.com/search?q=${searchQuery}`,
+    'Croma': `https://www.croma.com/searchB?q=${searchQuery}`,
+    'Reliance Digital': `https://www.reliancedigital.in/search?q=${searchQuery}`,
+  };
+  for (const p of requiredPlatforms) {
+    if (!completeListings.some(l => l.platform === p)) {
+      completeListings.push({
+        platform: p,
+        price: 0,
+        originalPrice: 0,
+        discount: 0,
+        rating: 0,
+        seller: 'Unknown',
+        deliveryTime: 'Unknown',
+        warranty: 'Unknown',
+        warrantyYears: 0,
+        image: '',
+        productUrl: platformSearchUrls[p] || '#',
+        available: false,
+        condition: 'new'
+      });
+    }
+  }
+
   return {
     id: product.id,
     name: product.name,
@@ -89,7 +120,7 @@ export async function hydrateProduct(product: DiscoveredProduct): Promise<Aggreg
     aiReasoning: product.aiReasoning,
     confidenceScore: product.confidenceScore,
     baseSpecs: product.baseSpecs,
-    listings,
+    listings: completeListings,
   };
 }
 

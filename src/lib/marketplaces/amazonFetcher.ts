@@ -3,6 +3,7 @@
 // ============================================================
 import * as cheerio from 'cheerio';
 import { MarketplaceFetchResult } from '../types';
+import { isAccessory } from './utils';
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -17,7 +18,7 @@ export async function fetchAmazonListing(searchKeywords: string): Promise<Market
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-IN,en;q=0.9',
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4500),
     });
 
     if (!response.ok) {
@@ -27,10 +28,18 @@ export async function fetchAmazonListing(searchKeywords: string): Promise<Market
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // Find first valid product result
-    const firstResult = $('[data-component-type="s-search-result"]').first();
-    if (!firstResult.length) {
-      return { platform: 'Amazon', success: false, listing: null, error: 'No results found' };
+    // Find first valid product result that is not an accessory
+    let firstResult: any = null;
+    $('[data-component-type="s-search-result"]').each((_, el) => {
+      if (firstResult) return;
+      const title = $(el).find('h2 a span').text();
+      if (title && !isAccessory(title, searchKeywords)) {
+        firstResult = $(el);
+      }
+    });
+
+    if (!firstResult) {
+      return { platform: 'Amazon', success: false, listing: null, error: 'No relevant results found' };
     }
 
     // Extract price
@@ -76,6 +85,7 @@ export async function fetchAmazonListing(searchKeywords: string): Promise<Market
       listing: {
         platform: 'Amazon',
         price,
+        originalPrice,
         discount,
         rating,
         seller: isRefurbished ? 'Amazon Renewed' : 'Amazon.in',
