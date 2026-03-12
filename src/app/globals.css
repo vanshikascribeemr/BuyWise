@@ -79,3 +79,11 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #86868b;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -1,0 +1,34 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  productId String
+  platform  String
+  price     Int
+  condition String   @default("new")
+  timestamp DateTime @default(now())
+
+  @@index([productId])
+  @@index([productId, platform])
+}
+
+model PriceAlert {
+  id          String   @id @default(cuid())
+  userId      String   @default("anonymous")
+  productId   String
+  targetPrice Int
+  email       String?
+  createdAt   DateTime @default(now())
+  isTriggered Boolean  @default(false)
+
+  @@index([productId])
+}
